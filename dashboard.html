@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+<div><h2>{{ store.store_name }}</h2><p class="text-muted">Welcome, {{ session.owner_name }}</p></div>
+<a class="btn btn-primary" href="{{ url_for('new_sale') }}">+ Create New Bill</a>
+</div>
+
+<div class="row g-3 mb-4">
+<div class="col-md-3"><div class="card card-body"><small>Today's Sales</small><h3>{{ stats.count }}</h3></div></div>
+<div class="col-md-3"><div class="card card-body"><small>Today's Revenue</small><h3>${{ "%.2f"|format(stats.revenue) }}</h3></div></div>
+<div class="col-md-3"><div class="card card-body"><small>Monthly Sales</small><h3>{{ monthly.count }}</h3></div></div>
+<div class="col-md-3"><div class="card card-body"><small>Monthly Revenue</small><h3>${{ "%.2f"|format(monthly.revenue) }}</h3></div></div>
+</div>
+
+<div class="card shadow-sm">
+<div class="card-body">
+<h4>Recent Sales</h4>
+<table class="table table-hover">
+<thead><tr><th>Bill</th><th>Customer</th><th>Total</th><th>Email</th><th>Date</th></tr></thead>
+<tbody>
+{% for sale in sales %}
+<tr>
+<td><a href="{{ url_for('view_sale', sale_id=sale.id) }}">{{ sale.invoice_number }}</a></td>
+<td>{{ sale.customer_name }}</td>
+<td>${{ "%.2f"|format(sale.total) }}</td>
+<td>
+{% if sale.email_status == "SENT" %}
+<span class="badge bg-success">Sent</span>
+{% elif sale.email_status == "FAILED" %}
+<span class="badge bg-danger">Failed</span>
+{% else %}
+<span class="badge bg-secondary">{{ sale.email_status }}</span>
+{% endif %}
+</td>
+<td>{{ sale.created_at }}</td>
+</tr>
+{% else %}
+<tr><td colspan="5">No sales yet.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+{% endblock %}
