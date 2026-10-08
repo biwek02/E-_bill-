@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h2>Bill {{ sale.invoice_number }}</h2>
+<div>
+<a class="btn btn-outline-primary" href="{{ url_for('sale_pdf', sale_id=sale.id) }}">Download PDF</a>
+<form class="d-inline" method="post" action="{{ url_for('resend_email', sale_id=sale.id) }}">
+<button class="btn btn-outline-success">Resend Email</button>
+</form>
+</div>
+</div>
+
+<div class="card shadow-sm">
+<div class="card-body">
+<h2>{{ store.store_name }}</h2>
+<p class="mb-1">{{ store.address }}</p>
+<p class="mb-1">Phone: {{ store.phone }}</p>
+<p class="mb-1">Email: {{ store.email }}</p>
+<p>PAN: {{ store.pan }} | Tax ID: {{ store.tax_id }}</p>
+<hr>
+<h4>E-BILL / INVOICE</h4>
+<p><strong>Bill:</strong> {{ sale.invoice_number }}</p>
+<p><strong>Date:</strong> {{ sale.created_at }}</p>
+<hr>
+<h5>Customer</h5>
+<p>{{ sale.customer_name }}<br>
+Phone: {{ sale.customer_phone }}<br>
+Email: {{ sale.customer_email }}</p>
+
+<table class="table">
+<thead><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+<tbody>
+{% for item in items %}
+<tr><td>{{ item.product_name }}</td><td>{{ item.quantity }}</td><td>${{ "%.2f"|format(item.unit_price) }}</td><td>${{ "%.2f"|format(item.total) }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+
+<div class="text-end">
+<p>Subtotal: ${{ "%.2f"|format(sale.subtotal) }}</p>
+<p>Discount: ${{ "%.2f"|format(sale.discount) }}</p>
+<p>Tax: ${{ "%.2f"|format(sale.tax) }}</p>
+<h4>Total: ${{ "%.2f"|format(sale.total) }}</h4>
+</div>
+
+<hr>
+<p><strong>Email status:</strong>
+{% if sale.email_status == "SENT" %}
+<span class="badge bg-success">Sent</span>
+{% else %}
+<span class="badge bg-danger">Failed</span>
+{% endif %}
+</p>
+{% if sale.email_error %}
+<div class="alert alert-warning">{{ sale.email_error }}</div>
+{% endif %}
+<p class="text-muted">Thank you for your business!</p>
+</div>
+</div>
+{% endblock %}
