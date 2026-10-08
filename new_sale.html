@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Create New Bill</h2>
+<form method="post" class="card card-body shadow-sm">
+<h5>Customer</h5>
+<div class="row">
+<div class="col-md-4 mb-3"><label class="form-label">Name *</label><input class="form-control" name="customer_name" required></div>
+<div class="col-md-4 mb-3"><label class="form-label">Phone</label><input class="form-control" name="customer_phone"></div>
+<div class="col-md-4 mb-3"><label class="form-label">Email *</label><input class="form-control" type="email" name="customer_email" required></div>
+</div>
+
+<hr>
+<h5>Items</h5>
+<div id="items">
+<div class="row item-row mb-2">
+<div class="col-md-5"><input class="form-control" name="product_name" placeholder="Product" required></div>
+<div class="col-md-2"><input class="form-control" type="number" step="0.01" name="quantity" placeholder="Qty" required></div>
+<div class="col-md-3"><input class="form-control" type="number" step="0.01" name="unit_price" placeholder="Unit Price" required></div>
+<div class="col-md-2"><button type="button" class="btn btn-outline-danger remove-item">Remove</button></div>
+</div>
+</div>
+<button type="button" class="btn btn-outline-secondary mb-3" id="add-item">+ Add Item</button>
+
+<div class="row">
+<div class="col-md-4 mb-3"><label class="form-label">Discount</label><input class="form-control" type="number" step="0.01" name="discount" value="0"></div>
+<div class="col-md-4 mb-3"><label class="form-label">Tax</label><input class="form-control" type="number" step="0.01" name="tax" value="0"></div>
+<div class="col-md-4 mb-3"><label class="form-label">Payment Method</label>
+<select class="form-select" name="payment_method">
+<option>Cash</option><option>Card</option><option>Bank Transfer</option><option>Other</option>
+</select></div>
+</div>
+
+<div class="alert alert-info">
+After you create the bill, the system will automatically attempt to email the completed PDF bill to the customer email above.
+</div>
+<button class="btn btn-primary">Create Bill & Email Customer</button>
+</form>
+
+<script>
+document.getElementById("add-item").addEventListener("click", function() {
+  const row = document.querySelector(".item-row").cloneNode(true);
+  row.querySelectorAll("input").forEach(input => input.value = "");
+  document.getElementById("items").appendChild(row);
+});
+document.addEventListener("click", function(e) {
+  if (e.target.classList.contains("remove-item")) {
+    const rows = document.querySelectorAll(".item-row");
+    if (rows.length > 1) e.target.closest(".item-row").remove();
+  }
+});
+</script>
+{% endblock %}

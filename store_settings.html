@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Store Information</h2>
+<form method="post" class="card card-body">
+<div class="mb-3"><label class="form-label">Store Name</label><input class="form-control" name="store_name" value="{{ store.store_name }}" required></div>
+<div class="mb-3"><label class="form-label">Address</label><textarea class="form-control" name="address">{{ store.address }}</textarea></div>
+<div class="row">
+<div class="col-md-6 mb-3"><label class="form-label">Phone</label><input class="form-control" name="phone" value="{{ store.phone }}"></div>
+<div class="col-md-6 mb-3"><label class="form-label">Email</label><input class="form-control" name="email" value="{{ store.email }}"></div>
+<div class="col-md-6 mb-3"><label class="form-label">PAN</label><input class="form-control" name="pan" value="{{ store.pan }}"></div>
+<div class="col-md-6 mb-3"><label class="form-label">Tax ID</label><input class="form-control" name="tax_id" value="{{ store.tax_id }}"></div>
+</div>
+<button class="btn btn-primary">Save Store Information</button>
+</form>
+{% endblock %}
