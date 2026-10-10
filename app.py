@@ -147,7 +147,13 @@ def send_bill_email(sale_id):
 Thank you for shopping with {sale['store_name']}.
 
 Your E-Bill {sale['invoice_number']} is attached to this email.
-Total: ${sale['total']:.2f}
+
+Subtotal: ${sale['subtotal']:.2f}
+Tax (13%): ${sale['tax']:.2f}
+Total before discount: ${(sale['subtotal'] + sale['tax']):.2f}
+Discount: ${sale['discount']:.2f}
+Final total: ${sale['total']:.2f}
+Payment method: {sale['payment_method']}
 
 Thank you for your business!
 """
@@ -227,11 +233,18 @@ def create_bill_pdf(sale, items):
     y -= 8
     pdf.line(350, y, width - 50, y)
     y -= 18
+    total_before_discount = sale["subtotal"] + sale["tax"]
+    discount_percent = (
+        (sale["discount"] / total_before_discount) * 100
+        if total_before_discount > 0 else 0
+    )
+
     for label, value in [
         ("Subtotal", sale["subtotal"]),
-        ("Discount", sale["discount"]),
-        ("Tax", sale["tax"]),
-        ("TOTAL", sale["total"]),
+        ("Tax (13%)", sale["tax"]),
+        ("Total Before Discount", total_before_discount),
+        (f"Discount ({discount_percent:.2f}%)", sale["discount"]),
+        ("FINAL TOTAL", sale["total"]),
     ]:
         pdf.drawRightString(470, y, label + ":")
         pdf.drawRightString(550, y, f"${value:.2f}")
@@ -380,7 +393,11 @@ def new_sale():
         customer_name = request.form["customer_name"].strip()
         customer_phone = request.form.get("customer_phone", "").strip()
         customer_email = request.form["customer_email"].strip()
-        payment_method = request.form["payment_method"]
+        payment_method = request.form.get("payment_method", "").strip()
+
+        if not payment_method:
+            flash("Please select a payment method.")
+            return render_template("new_sale.html")
 
         product_names = request.form.getlist("product_name")
         quantities = request.form.getlist("quantity")
@@ -413,13 +430,26 @@ def new_sale():
             return render_template("new_sale.html")
 
         try:
-            discount = float(request.form.get("discount", "0") or 0)
-            tax = float(request.form.get("tax", "0") or 0)
+            discount_percent = float(request.form.get("discount_percent", "0") or 0)
         except ValueError:
-            flash("Discount and tax must be numbers.")
+            flash("Discount must be a number.")
             return render_template("new_sale.html")
 
-        total = max(0, subtotal - discount + tax)
+        if discount_percent < 0 or discount_percent > 100:
+            flash("Discount must be between 0% and 100%.")
+            return render_template("new_sale.html")
+
+        # E-Bill calculation:
+        # 1. Subtotal = quantity × unit price
+        # 2. Tax = 13% of subtotal
+        # 3. Total before discount = subtotal + tax
+        # 4. Discount = discount percentage of total before discount
+        # 5. Final total = total before discount - discount
+        tax_rate = 13.0
+        tax = subtotal * (tax_rate / 100)
+        total_before_discount = subtotal + tax
+        discount = total_before_discount * (discount_percent / 100)
+        total = max(0, total_before_discount - discount)
         now = datetime.now()
         expires = now + timedelta(days=30)
         invoice = next_invoice_number(user_id)
