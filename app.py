@@ -8,7 +8,7 @@ from io import BytesIO
 
 from flask import Flask, flash, redirect, render_template, request, send_file, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
 
 app = Flask(__name__)
@@ -176,81 +176,87 @@ Thank you for your business!
 
 
 def create_bill_pdf(sale, items):
+    """Create a narrow, vertical 3.5-inch receipt PDF."""
     store = get_store(sale["user_id"])
     buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
+    page_width = 3.5 * inch
+    # Dynamic height keeps the receipt vertical and gives every item room.
+    page_height = max(360, (300 + len(items) * 34))
+    pdf = canvas.Canvas(buffer, pagesize=(page_width, page_height))
+    left, right = 12, page_width - 12
+    y = page_height - 22
 
-    y = height - 50
-    pdf.setFont("Helvetica-Bold", 18)
-    pdf.drawString(50, y, store["store_name"])
-    y -= 22
-
-    pdf.setFont("Helvetica", 9)
-    for line in [store["address"], f"Phone: {store['phone'] or ''}",
-                 f"Email: {store['email'] or ''}", f"PAN: {store['pan'] or ''}",
-                 f"Tax ID: {store['tax_id'] or ''}"]:
+    def wrapped(text, max_chars=39, font="Helvetica", size=8, leading=11):
+        nonlocal y
+        text = str(text or "")
+        words = text.split()
+        lines, line = [], ""
+        for word in words:
+            candidate = (line + " " + word).strip()
+            if len(candidate) > max_chars and line:
+                lines.append(line)
+                line = word
+            else:
+                line = candidate
         if line:
-            pdf.drawString(50, y, line)
-            y -= 13
+            lines.append(line)
+        pdf.setFont(font, size)
+        for part in lines:
+            pdf.drawString(left, y, part)
+            y -= leading
 
-    y -= 15
-    pdf.setFont("Helvetica-Bold", 14)
-    pdf.drawString(50, y, "E-BILL / INVOICE")
-    y -= 22
-
-    pdf.setFont("Helvetica", 10)
-    details = [
-        f"Bill No: {sale['invoice_number']}",
-        f"Date: {sale['created_at']}",
-        f"Customer: {sale['customer_name']}",
-        f"Phone: {sale['customer_phone'] or ''}",
-        f"Email: {sale['customer_email']}",
-        f"Payment: {sale['payment_method']}",
-    ]
-    for line in details:
-        pdf.drawString(50, y, line)
-        y -= 15
-
-    y -= 10
-    pdf.line(50, y, width - 50, y)
-    y -= 20
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(50, y, "Item")
-    pdf.drawString(300, y, "Qty")
-    pdf.drawString(380, y, "Unit")
-    pdf.drawString(470, y, "Total")
+    pdf.setFont("Helvetica-Bold", 12)
+    wrapped(store["store_name"], 31, "Helvetica-Bold", 12, 15)
+    wrapped(store["address"], 39)
+    wrapped("Phone: " + (store["phone"] or ""))
+    wrapped("Email: " + (store["email"] or ""))
+    wrapped("PAN: " + (store["pan"] or ""))
+    wrapped("Tax ID: " + (store["tax_id"] or ""))
+    y -= 4
+    pdf.setLineWidth(0.6)
+    pdf.line(left, y, right, y)
     y -= 16
-
-    pdf.setFont("Helvetica", 10)
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawCentredString(page_width / 2, y, "E-BILL / INVOICE")
+    y -= 17
+    wrapped("Bill: " + sale["invoice_number"], 39, "Helvetica-Bold", 8)
+    wrapped("Date: " + sale["created_at"])
+    wrapped("Customer: " + sale["customer_name"])
+    wrapped("Phone: " + (sale["customer_phone"] or ""))
+    wrapped("Email: " + sale["customer_email"])
+    wrapped("Payment: " + sale["payment_method"])
+    y -= 4
+    pdf.line(left, y, right, y)
+    y -= 14
+    pdf.setFont("Helvetica-Bold", 8)
+    pdf.drawString(left, y, "Item / Qty x Unit")
+    pdf.drawRightString(right, y, "Amount")
+    y -= 13
+    pdf.setFont("Helvetica", 8)
     for item in items:
-        pdf.drawString(50, y, str(item["product_name"])[:38])
-        pdf.drawRightString(330, y, f"{item['quantity']:g}")
-        pdf.drawRightString(430, y, f"${item['unit_price']:.2f}")
-        pdf.drawRightString(550, y, f"${item['total']:.2f}")
-        y -= 16
-
-    y -= 8
-    pdf.line(350, y, width - 50, y)
-    y -= 18
-    total_before_discount = sale["subtotal"] + sale["tax"]
-    discount_percent = (
-        (sale["discount"] / total_before_discount) * 100
-        if total_before_discount > 0 else 0
-    )
-
-    for label, value in [
-        ("Subtotal", sale["subtotal"]),
-        ("Tax (13%)", sale["tax"]),
-        ("Total Before Discount", total_before_discount),
-        (f"Discount ({discount_percent:.2f}%)", sale["discount"]),
-        ("FINAL TOTAL", sale["total"]),
+        wrapped(item["product_name"], 31, "Helvetica-Bold", 8, 10)
+        pdf.drawString(left + 4, y, f'{item["quantity"]:g} x ${item["unit_price"]:.2f}')
+        pdf.drawRightString(right, y, f'${item["total"]:.2f}')
+        y -= 13
+    y -= 3
+    pdf.line(left, y, right, y)
+    y -= 14
+    before_discount = sale["subtotal"] + sale["tax"]
+    discount_percent = (sale["discount"] / before_discount * 100) if before_discount else 0
+    for label, value, bold in [
+        ("Subtotal", sale["subtotal"], False),
+        ("Tax (13%)", sale["tax"], False),
+        ("Before discount", before_discount, False),
+        (f"Discount ({discount_percent:.2f}%)", sale["discount"], False),
+        ("FINAL TOTAL", sale["total"], True),
     ]:
-        pdf.drawRightString(470, y, label + ":")
-        pdf.drawRightString(550, y, f"${value:.2f}")
-        y -= 16
-
-    pdf.drawString(50, 55, "Thank you for your business!")
+        pdf.setFont("Helvetica-Bold" if bold else "Helvetica", 8)
+        pdf.drawString(left, y, label)
+        pdf.drawRightString(right, y, f"${value:.2f}")
+        y -= 14
+    y -= 5
+    pdf.setFont("Helvetica-Oblique", 8)
+    pdf.drawCentredString(page_width / 2, y, "Thank you for your business!")
     pdf.save()
     buffer.seek(0)
     return buffer.getvalue()
@@ -389,7 +395,16 @@ def dashboard():
 @login_required
 def new_sale():
     if request.method == "POST":
-        user_id = session["user_id"]
+        user_id = session.get("user_id")
+        check_conn = get_db()
+        try:
+            existing_user = check_conn.execute("SELECT id FROM users WHERE id = ?", (user_id,)).fetchone()
+        finally:
+            check_conn.close()
+        if not existing_user:
+            session.clear()
+            flash("Your session expired or the account database changed. Please log in again.")
+            return redirect(url_for("login"))
         customer_name = request.form["customer_name"].strip()
         customer_phone = request.form.get("customer_phone", "").strip()
         customer_email = request.form["customer_email"].strip()
@@ -455,47 +470,34 @@ def new_sale():
         invoice = next_invoice_number(user_id)
 
         conn = get_db()
-        cur = conn.execute("""
-            INSERT INTO sales
-            (user_id, invoice_number, customer_name, customer_phone, customer_email,
-             subtotal, discount, tax, total, payment_method, created_at, expires_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            user_id, invoice, customer_name, customer_phone, customer_email,
-            subtotal, discount, tax, total, payment_method,
-            now.strftime("%Y-%m-%d %H:%M:%S"),
-            expires.strftime("%Y-%m-%d %H:%M:%S")
-        ))
-        sale_id = cur.lastrowid
+        try:
+            cur = conn.execute("""
+                INSERT INTO sales
+                (user_id, invoice_number, customer_name, customer_phone, customer_email,
+                 subtotal, discount, tax, total, payment_method, email_status, created_at, expires_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NOT_SENT', ?, ?)
+            """, (
+                user_id, invoice, customer_name, customer_phone, customer_email,
+                subtotal, discount, tax, total, payment_method,
+                now.strftime("%Y-%m-%d %H:%M:%S"),
+                expires.strftime("%Y-%m-%d %H:%M:%S")
+            ))
+            sale_id = cur.lastrowid
+            conn.executemany("""
+                INSERT INTO sale_items
+                (sale_id, product_name, quantity, unit_price, total)
+                VALUES (?, ?, ?, ?, ?)
+            """, [(sale_id, *item) for item in items])
+            conn.commit()
+        except sqlite3.Error as exc:
+            conn.rollback()
+            app.logger.exception("Could not save new sale")
+            flash("Could not save the bill because of a database error. Please log in again and retry.")
+            return render_template("new_sale.html")
+        finally:
+            conn.close()
 
-        conn.executemany("""
-            INSERT INTO sale_items
-            (sale_id, product_name, quantity, unit_price, total)
-            VALUES (?, ?, ?, ?, ?)
-        """, [(sale_id, *item) for item in items])
-
-        conn.commit()
-        conn.close()
-
-        # Email is intentionally triggered AFTER the bill is saved.
-        ok, error = send_bill_email(sale_id)
-
-        conn = get_db()
-        if ok:
-            conn.execute(
-                "UPDATE sales SET email_status = 'SENT', email_error = NULL WHERE id = ?",
-                (sale_id,)
-            )
-            flash(f"Bill {invoice} created and emailed to {customer_email}.")
-        else:
-            conn.execute(
-                "UPDATE sales SET email_status = 'FAILED', email_error = ? WHERE id = ?",
-                (error, sale_id)
-            )
-            flash(f"Bill {invoice} was created, but email failed: {error}")
-        conn.commit()
-        conn.close()
-
+        flash(f"Bill {invoice} created. Choose Print Receipt or Send to Email below.")
         return redirect(url_for("view_sale", sale_id=sale_id))
 
     return render_template("new_sale.html")
