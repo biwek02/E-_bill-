@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+<div class="col-md-5">
+<div class="card shadow-sm">
+<div class="card-body">
+<h2 class="mb-4">E-Bill Login</h2>
+<form method="post">
+<label class="form-label">Username or Email</label>
+<input class="form-control mb-3" name="identifier" required>
+<label class="form-label">Password</label>
+<input class="form-control mb-3" type="password" name="password" required>
+<button class="btn btn-primary w-100">Login</button>
+</form>
+<hr>
+<a href="{{ url_for('signup') }}">Create a new store account</a>
+</div>
+</div>
+</div>
+</div>
+{% endblock %}

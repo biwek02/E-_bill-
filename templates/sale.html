@@ -1,0 +1,157 @@
+
+{% extends "base.html" %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 no-print">
+  <h2>Bill {{ sale.invoice_number }}</h2>
+  <div>
+    <button class="btn btn-primary" type="button" onclick="window.print()">Print 3.5-inch Receipt</button>
+    <a class="btn btn-outline-primary" href="{{ url_for('sale_pdf', sale_id=sale.id) }}">Download Receipt PDF</a>
+  </div>
+</div>
+
+<div class="modal fade no-print" id="billActionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Bill Created — Choose an Action</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>How would you like to deliver bill {{ sale.invoice_number }}?</p>
+        <p class="small text-muted">Customer email: {{ sale.customer_email }}</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" type="button" data-bs-dismiss="modal" onclick="window.print()">Print Receipt (3.5-inch)</button>
+        <form method="post" action="{{ url_for('resend_email', sale_id=sale.id) }}">
+          <button class="btn btn-success" type="submit">Send to Email</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="receipt" id="receipt">
+  <div class="receipt-center">
+    <h2>{{ store.store_name }}</h2>
+    {% if store.address %}<div>{{ store.address }}</div>{% endif %}
+    {% if store.phone %}<div>Phone: {{ store.phone }}</div>{% endif %}
+    {% if store.email %}<div>{{ store.email }}</div>{% endif %}
+    {% if store.pan %}<div>PAN: {{ store.pan }}</div>{% endif %}
+    {% if store.tax_id %}<div>Tax ID: {{ store.tax_id }}</div>{% endif %}
+  </div>
+
+  <hr>
+  <h3 class="receipt-center">E-BILL / INVOICE</h3>
+  <div><b>Bill:</b> {{ sale.invoice_number }}</div>
+  <div><b>Date:</b> {{ sale.created_at }}</div>
+  <hr>
+
+  <div><b>Customer:</b> {{ sale.customer_name }}</div>
+  {% if sale.customer_phone %}<div>Phone: {{ sale.customer_phone }}</div>{% endif %}
+  <div class="wrap-email">Email: {{ sale.customer_email }}</div>
+  <div>Payment: {{ sale.payment_method }}</div>
+  <hr>
+
+  {% for item in items %}
+    <div class="item">
+      <div><b>{{ item.product_name }}</b></div>
+      <div class="item-sub">
+        <span>{{ item.quantity }} × ${{ "%.2f"|format(item.unit_price) }}</span>
+        <b>${{ "%.2f"|format(item.total) }}</b>
+      </div>
+    </div>
+  {% endfor %}
+
+  <hr>
+  {% set before_discount = sale.subtotal + sale.tax %}
+  {% set discount_percent = (sale.discount / before_discount * 100) if before_discount else 0 %}
+
+  <div class="total-row"><span>Subtotal</span><span>${{ "%.2f"|format(sale.subtotal) }}</span></div>
+  <div class="total-row"><span>Tax (13%)</span><span>${{ "%.2f"|format(sale.tax) }}</span></div>
+  <div class="total-row"><span>Before discount</span><span>${{ "%.2f"|format(before_discount) }}</span></div>
+  <div class="total-row"><span>Discount ({{ "%.2f"|format(discount_percent) }}%)</span><span>−${{ "%.2f"|format(sale.discount) }}</span></div>
+  <div class="total-row final-total"><span>FINAL TOTAL</span><span>${{ "%.2f"|format(sale.total) }}</span></div>
+
+  <hr>
+  <p class="receipt-center">Thank you for your business!</p>
+
+  <div class="no-print email-status">
+    <b>Email status:</b>
+    {% if sale.email_status == 'SENT' %}
+      <span class="badge bg-success">Sent</span>
+    {% elif sale.email_status == 'NOT_SENT' %}
+      <span class="badge bg-secondary">Not sent yet</span>
+    {% else %}
+      <span class="badge bg-warning text-dark">Failed</span>
+    {% endif %}
+    {% if sale.email_error %}
+      <div class="alert alert-warning mt-2">{{ sale.email_error }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+.receipt {
+  width: 3.5in;
+  max-width: 100%;
+  margin: 0 auto;
+  background: #fff;
+  padding: 0.12in;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10px;
+  color: #000;
+  overflow-wrap: anywhere;
+}
+.receipt h2 { font-size: 15px; margin: 0 0 5px; }
+.receipt h3 { font-size: 13px; }
+.receipt-center { text-align: center; }
+.receipt hr { border: 0; border-top: 1px dashed #333; margin: 8px 0; }
+.item { margin: 7px 0; }
+.item-sub, .total-row { display: flex; justify-content: space-between; gap: 6px; }
+.final-total { font-weight: bold; font-size: 12px; margin-top: 5px; }
+.wrap-email { overflow-wrap: anywhere; }
+
+@media print {
+  @page { size: 3.5in auto; margin: 0.08in; }
+  html, body {
+    width: 3.5in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .navbar, .container > div:not(#receipt), .no-print { display: none !important; }
+  .container {
+    width: 3.5in !important;
+    max-width: 3.5in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .receipt {
+    width: 3.34in !important;
+    max-width: 3.34in !important;
+    margin: 0 !important;
+    padding: 0.05in !important;
+    box-shadow: none !important;
+    font-size: 9px !important;
+  }
+  .receipt h2 { font-size: 13px !important; }
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (!sessionStorage.getItem('ebillActionDismissed_{{ sale.id }}')) {
+    const modalEl = document.getElementById('billActionModal');
+    if (modalEl) {
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+      modalEl.addEventListener('hidden.bs.modal', () => {
+        sessionStorage.setItem('ebillActionDismissed_{{ sale.id }}', '1');
+      });
+    }
+  }
+});
+</script>
+{% endblock %}
